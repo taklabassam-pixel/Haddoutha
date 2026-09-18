@@ -1,0 +1,26 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+
+# Editor
+.vscode
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Vosk Models & Large Assets
+public/vosk-model-ar-mgb2-0.4.*
+public/models/
+public/audio/stories/*.pdf
+public/audio/stories/ملفات مساعدة/hommuda wal babagaa.pdf
