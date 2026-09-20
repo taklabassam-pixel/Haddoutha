@@ -1,8 +1,9 @@
 import { StoryMeta, StoryChunk } from '../types/types';
 
-// توسيع واجهة القصة لتشمل الـ chunks
+// توسيع واجهة القصة لتشمل الـ chunks والـ duration
 export interface FullStory extends StoryMeta {
   chunks: StoryChunk[];
+  duration: number;
 }
 
 interface StoryMetaFile {
@@ -43,6 +44,38 @@ Object.entries(metaModules).forEach(([filePath, meta]) => {
     }
   }
 
+  // ✨ 3. التأكد من وجود المقطع التمهيدي (id: 0) وصورة scene_0.png في البداية تلقائياً
+  const hasIntro = storyChunks.some((chunk: any) => chunk.id === 0 || chunk.id === '0');
+  
+  if (!hasIntro) {
+    const introChunk: StoryChunk = {
+      id: 0,
+      text: meta.title || "بداية القصة",
+      imageAsset: `/audio/stories/${storyFolderId}/scene_0.png`,
+    };
+    storyChunks = [introChunk, ...storyChunks];
+  }
+
+  // ⏱️ 4. تطبيق منطق التوزيع النسبي للوقت بناءً على عدد الأحرف لكل مقطع مقارنة بالمدة الكلية
+  const totalDuration = meta.duration || 0;
+  const totalChars = storyChunks.reduce((sum, chunk) => sum + (chunk.text?.length || 1), 0);
+
+  let accumulatedTime = 0;
+  storyChunks = storyChunks.map((chunk, index) => {
+    const charCount = chunk.text?.length || 1;
+    // حساب حصة هذا المقطع زمنياً بناءً على نسبة عدد أحرفه
+    const chunkDuration = totalChars > 0 ? (charCount / totalChars) * totalDuration : 0;
+    
+    const startTime = accumulatedTime;
+    accumulatedTime += chunkDuration;
+
+    return {
+      ...chunk,
+      id: index, // ضمان تسلسل المعرفات من 0 تصاعدياً
+      startTime: Number(startTime.toFixed(2)), // تعيين توقيت البدء النسبي بدقة
+    };
+  });
+
   STORIES_DATA[storyFolderId] = {
     id: storyFolderId,
     title: meta.title || storyFolderId,
@@ -52,14 +85,15 @@ Object.entries(metaModules).forEach(([filePath, meta]) => {
     fullStoryAudio: `/audio/stories/${storyFolderId}/full_story.mp3`,
     bgMusicUrl: '/audio/static/bg_music.mp3',
     coverImage: `/audio/stories/${storyFolderId}/cover.png`,
-    chunks: storyChunks, // ✨ إدراج المقاطع والـ imageAsset هنا بنجاح
+    duration: totalDuration,
+    chunks: storyChunks, // ✨ إدراج المقاطع مسبوقة بالمقطع 0 وموزعة الأوقات نسبياً
   };
 });
 
-// 3. تصدير مصفوفة القصص الموحدة
+// 5. تصدير مصفوفة القصص الموحدة
 export const STORIES_LIST: FullStory[] = Object.values(STORIES_DATA);
 
-// 4. دالة الاستعلام المباشر عن القصة
+// 6. دالة الاستعلام المباشر عن القصة
 export const getStoryById = (id: string): FullStory | undefined => {
   return STORIES_LIST.find((story) => story.id === id);
 };

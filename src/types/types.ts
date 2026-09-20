@@ -31,14 +31,13 @@ export interface CharacterVideoOverlayProps {
 export interface StoryMeta {
   id: string;
   title: string;
-  coverImage: string;
+  description: string;
   fileName: string;
-  description?: string;
-  bgMusicUrl?: string;
-  audioUrl?: string;
-  titleAudio?: string;     // 👈 مسار صوت العنوان/المقدمة
-  fullStoryAudio?: string; // 👈 مسار الصوت الكامل للقصة
-  chunks?: StoryChunk[];
+  audioUrl: string;
+  fullStoryAudio: string;
+  bgMusicUrl: string;
+  coverImage: string;
+  duration: number; // ✨ إضافة هذا السطر لحل مشكلة الخط الأحمر تحت duration
 }
 
 export type Screen = 'home' | 'stories' | 'record' | 'archive' | 'player';

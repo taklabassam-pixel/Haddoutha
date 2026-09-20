@@ -3,10 +3,14 @@ import { RecordScreen } from './components/pages/RecordScreen';
 import { KNOWN_NAME_PATTERNS } from './data/namesDatabase';
 import StoryIntroPlayer from './components/player/StoryIntroPlayer';
 import StoryPlayer from './components/player/StoryPlayer';
-import { Screen, DialogueState, StoryMeta} from './types/types';
+import { Screen, DialogueState, StoryMeta } from './types/types';
 import { STORIES_LIST } from './data/stories';
 import { OwlAvatar } from './components/OwlAvatar';
 
+// استيراد المكونات وغلاف الانتقال السلس والشاشات الرئيسية
+import ScreenWrapper from './components/ScreenWrapper';
+import HomeScreen from './screens/HomeScreen';
+import StoriesListScreen from './screens/StoriesListScreen';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [dialogueState, setDialogueState] = useState<DialogueState>('ASK_GENDER');
@@ -49,7 +53,7 @@ export default function App() {
       const normalizedChar = ['أ', 'إ', 'آ'].includes(firstChar) ? 'أ' : firstChar;
       lettersSet.add(normalizedChar);
     });
-    return Array.from(lettersSet).sort((a, b) => a.localeCompare(a, 'ar'));
+    return Array.from(lettersSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [childGender]);
 
   // حساب الأسماء المفلترة
@@ -85,12 +89,11 @@ export default function App() {
   };
 
   // 4. اختيار القصة
- const handleStartStory = (story: StoryMeta) => {
-  // 1. تعيين القصة المختارة وتحديث حالة الحوار
-  setSelectedStory(story);
-  setIsIntroFinished(false);
-  setDialogueState('CONFIRMED');
-};
+  const handleStartStory = (story: StoryMeta) => {
+    setSelectedStory(story);
+    setIsIntroFinished(false);
+    setDialogueState('CONFIRMED');
+  };
 
   // نص كلام البومة التفاعلي
   const getOwlSpeech = useCallback((): string => {
@@ -293,8 +296,7 @@ export default function App() {
     setIsIntroAudioFinished(false);
     setCurrentScreen('home');
   };
-
-  return (
+return (
     <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden select-none flex flex-col justify-between" dir="rtl">
       
       {/* عنصر الصوت الرئيسي */}
@@ -357,8 +359,8 @@ export default function App() {
         </nav>
       </header>
 
-      {/* المحتوى الرئيسي */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 text-center">
+      {/* المحتوى الرئيسي باستخدام ScreenWrapper للانتقال السلس */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 text-center overflow-hidden">
         
         {/* صورة القمر */}
         <div className="absolute top-6 right-8 md:top-10 md:right-16 z-0 pointer-events-none select-none">
@@ -368,9 +370,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* الشاشة الرئيسية */}
-        {currentScreen === 'home' && (
-          <div className="flex flex-col items-center gap-5 max-w-2xl w-full relative z-10">
+        {/* 1. الشاشة الرئيسية */}
+        <ScreenWrapper isActive={currentScreen === 'home'}>
+          <div className="flex flex-col items-center gap-5 max-w-2xl w-full relative z-10 mx-auto h-full justify-center overflow-y-auto">
             
             {/* البومة التفاعلية */}
             <div className="w-36 h-36 md:w-44 md:h-44 relative flex items-center justify-center">
@@ -496,7 +498,7 @@ export default function App() {
               </div>
             )}
 
-{/* مشغل القصة المختارة */}
+            {/* مشغل القصة المختارة */}
             {dialogueState === 'CONFIRMED' && selectedStory && (
               <div className="w-full flex justify-center">
                 <StoryPlayer 
@@ -512,11 +514,11 @@ export default function App() {
             )}
 
           </div>
-        )}
+        </ScreenWrapper>
 
-        {/* شاشة مكتبة القصص */}
-        {currentScreen === 'stories' && (
-          <div className="bg-slate-900/90 p-6 rounded-3xl border border-amber-400/30 backdrop-blur-md max-w-md w-full shadow-2xl flex flex-col items-center gap-4">
+        {/* 2. شاشة مكتبة القصص باستخدام ScreenWrapper */}
+        <ScreenWrapper isActive={currentScreen === 'stories'}>
+          <div className="bg-slate-900/90 p-6 rounded-3xl border border-amber-400/30 backdrop-blur-md max-w-md w-full shadow-2xl flex flex-col items-center gap-4 mx-auto my-auto">
             <h2 className="text-2xl font-black text-amber-300">📚 مكتبة القصص</h2>
             
             <div className="grid grid-cols-1 gap-3 w-full max-h-72 overflow-y-auto">
@@ -548,15 +550,18 @@ export default function App() {
               العودة للرئيسية
             </button>
           </div>
-        )}
+        </ScreenWrapper>
 
-        {/* شاشة التسجيل */}
-        {currentScreen === 'record' && (
-          <RecordScreen
-            onBack={resetToHome}
-            onSaveAudio={handleSaveAudio}
-          />
-        )}
+        {/* 3. شاشة التسجيل باستخدام ScreenWrapper */}
+        <ScreenWrapper isActive={currentScreen === 'record'}>
+          <div className="w-full h-full flex items-center justify-center">
+            <RecordScreen
+              onBack={resetToHome}
+              onSaveAudio={handleSaveAudio}
+            />
+          </div>
+        </ScreenWrapper>
+
       </main>
 
       {/* الفوتر */}

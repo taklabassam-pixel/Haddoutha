@@ -2,7 +2,7 @@
     "total_chunks": 89,
     "coverImage": "/audio/stories/Hammouda_and_the_caged_parrot/cover.png",
     "chunks": [
-        { "id": 1, "text": "حَمُّودَة والبَبَّغاءُ", "imageAsset": "/audio/stories/Hammouda_and_the_caged_parrot/cover.png" },
+        { "id": 1, "text": "حَمُّودَة والبَبَّغاءُ", "imageAsset": "/audio/stories/Hammouda_and_the_caged_parrot/scene_0.png" },
         { "id": 2, "text": "كانَ عِنْدَ حَمُّودَة بَبَّغاءُ جَميلَةٌ ذاتُ ألوان زاهية" },
         { "id": 3, "text": "يَضَعُها في قَفَصِ ذَهَبي صَغيرِ" },
         { "id": 4, "text": "وَيَضَعُ أَمامَها البُنْدُقَ كَيْ تَأْكُلَ" },

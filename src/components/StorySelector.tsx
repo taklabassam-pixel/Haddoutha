@@ -1,9 +1,10 @@
 import React from 'react';
-import { STORIES_LIST, Story } from '../data/stories';
+import { STORIES_LIST, FullStory } from '../data/stories'; // أو استيراد StoryMeta إذا كانت معرفة هناك
+import { StoryMeta } from '../types/types';
 
 interface StorySelectorProps {
   selectedStoryId: string | null;
-  onSelectStory: (story: Story) => void;
+  onSelectStory: (story: StoryMeta) => void;
 }
 
 export const StorySelector: React.FC<StorySelectorProps> = ({

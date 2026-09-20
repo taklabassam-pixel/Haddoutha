@@ -27,134 +27,168 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [bgVolume, setBgVolume] = useState<number>(0.25);
 
-  const chunks: StoryChunk[] = (story as { chunks?: StoryChunk[] })?.chunks ?? [];
+  // 🌟 حقن المقطع التمهيدي (id: 0) تلقائياً في بداية القصة إذا لم يكن موجوداً
+  const initializedChunks = React.useMemo(() => {
+    if (!story || !story.chunks) return [];
+
+    const hasIntro = story.chunks.some((chunk: any) => chunk.id === 0 || chunk.id === '0');
+
+    if (!hasIntro) {
+      const introChunk = {
+        id: 0,
+        text: story.title || "بداية القصة",
+        startTime: 0,
+        imageAsset: `/audio/stories/${story.title?.replace(/\s+/g, '_') || 'story'}/cover.png`,
+      };
+      return [introChunk, ...story.chunks];
+    }
+
+    return story.chunks;
+  }, [story]);
+
+  // 🌟 استخدام initializedChunks كمرجع أساسي موحد للمقاطع
+  const chunks: StoryChunk[] = initializedChunks;
   const currentChunk: StoryChunk | null = chunks.length > 0 ? chunks[currentChunkIndex] : null;
 
   const currentAudioUrl = currentChunk?.audioUrl || story?.audioUrl || '';
 
-// 🖼️ دالة العرض المبسطة والأصح: تعتمد على حدود المحور الثابتة والوقت الفعلي
+  // 🖼️ دالة العرض القياسية وتتبع المشاهد
   const getActiveVisual = () => {
-    if (!isPlaying && currentTime === 0 && currentChunkIndex === 0) {
+    console.log(`🎬 [TRACE START] currentTime: ${currentTime.toFixed(2)}s | currentChunkIndex: ${currentChunkIndex}`);
+
+    if (!chunks.length) {
+      console.log(`⚠️ [TRACE]: مصفوفة الـ chunks فارغة تماماً!`);
       return { type: 'image', src: story?.coverImage || '' };
     }
 
-    if (!currentChunk) {
-      return { type: 'owl', src: '' };
-    }
+    // 1. فحص المقطع النشط حالياً بناءً على مؤشر الـ index
+    const currentChunk = chunks[currentChunkIndex];
+    console.log(`📦 [TRACE CURRENT CHUNK]:`, {
+      id: currentChunk?.id,
+      startTime: currentChunk?.startTime,
+      hasImageAsset: !!currentChunk?.imageAsset,
+      text: currentChunk?.text?.substring(0, 20)
+    });
 
-    // العثور على أصل المحور المحوري الحالي (الذي يحمل الصورة)
+    // 2. البحث عن الـ Pivot الحالي (أول مقطع خلفه أو هو يمتلك imageAsset)
     let pivotChunkIndex = currentChunkIndex;
     while (pivotChunkIndex >= 0 && !chunks[pivotChunkIndex]?.imageAsset) {
       pivotChunkIndex--;
     }
 
-    if (pivotChunkIndex >= 0) {
-      const pivotChunk = chunks[pivotChunkIndex];
-      const activeImageSrc = pivotChunk.imageAsset!;
-      const pivotId = pivotChunk.id;
+    console.log(`🔍 [TRACE PIVOT SEARCH]: تم العثور على pivotChunkIndex عند الفهرس: ${pivotChunkIndex}`);
 
-      // العثور على نقطة نهاية هذا المحور (وهي إما بداية المحور التالي أو نهاية القصة)
-      let nextPivotIndex = pivotChunkIndex + 1;
-      while (nextPivotIndex < chunks.length && !chunks[nextPivotIndex]?.imageAsset) {
-        nextPivotIndex++;
-      }
-
-      const pivotStartTime = pivotChunk.startTime ?? 0;
-      const pivotEndTime = nextPivotIndex < chunks.length ? (chunks[nextPivotIndex].startTime ?? duration) : duration;
-      
-      const pivotDuration = pivotEndTime - pivotStartTime;
-      const elapsedInPivot = currentTime - pivotStartTime;
-      
-      const imageTimeLimit = pivotDuration * 0.85; // 85% للصورة
-      const isImagePhase = elapsedInPivot <= imageTimeLimit && elapsedInPivot >= 0;
-
-      // 🔍 متابعة دقيقة ومضبوطة للوقت الفعلي
-      console.log(`⏱️ [التوقيت الفعلي]: المحور ID: ${pivotId} | الصورة: ${activeImageSrc.split('/').pop()} | الزمن الحالي: ${currentTime.toFixed(2)}s / حد الـ 85%: ${imageTimeLimit.toFixed(2)}s | العرض: ${isImagePhase ? '📷 صورة' : '🦉 بومة'}`);
-
-      if (isImagePhase) {
-        return { type: 'image', src: activeImageSrc };
-      } else {
-        return { type: 'owl', src: '' };
-      }
+    if (pivotChunkIndex < 0) {
+      console.log(`⚠️ [TRACE]: لم يتم العثور على أي Pivot يحمل صورة، سيتم عرض الغلاف الافتراضي.`);
+      return { type: 'image', src: story?.coverImage || '' };
     }
 
-    return { type: 'owl', src: '' };
-  };
+    const pivotChunk = chunks[pivotChunkIndex];
+    const activeImageSrc = pivotChunk.imageAsset!;
+    const pivotId = pivotChunk.id;
 
+    // 3. البحث عن الـ Pivot التالي لتحديد نطاق الوقت
+    let nextPivotIndex = pivotChunkIndex + 1;
+    while (nextPivotIndex < chunks.length && !chunks[nextPivotIndex]?.imageAsset) {
+      nextPivotIndex++;
+    }
+
+    const pivotStartTime = pivotChunk.startTime ?? 0;
+    const pivotEndTime = nextPivotIndex < chunks.length ? (chunks[nextPivotIndex].startTime ?? duration) : duration;
+    
+    const pivotDuration = pivotEndTime - pivotStartTime;
+    const elapsedInPivot = currentTime - pivotStartTime;
+    const imageTimeLimit = pivotDuration * 0.85;
+    const isImagePhase = elapsedInPivot <= imageTimeLimit && elapsedInPivot >= 0;
+
+    console.log(`📊 [TRACE CALCULATIONS]:`, {
+      pivotId,
+      activeImageSrc: activeImageSrc.split('/').pop(),
+      pivotStartTime,
+      pivotEndTime,
+      pivotDuration: pivotDuration.toFixed(2),
+      elapsedInPivot: elapsedInPivot.toFixed(2),
+      imageTimeLimit: imageTimeLimit.toFixed(2),
+      isImagePhase
+    });
+
+    if (isImagePhase) {
+      return { type: 'image', src: activeImageSrc };
+    } else {
+      return { type: 'owl', src: '' };
+    }
+  };
+ const chunkTimesRef = useRef<{ startTime: number; endTime: number }[]>([]);
   const visual = getActiveVisual();
 
-  // ⏱️ احتساب وتحديد الأوقات للمقاطع المحورية الثمانية واقتصار الكونسول عليها
+  // استخدام useRef لحفظ الـ chunks الحالية لتجنب مشاكل الـ Closure في الـ Event Listeners
+  const chunksRef = useRef(chunks);
   useEffect(() => {
-    if (!currentAudioUrl) return;
+    chunksRef.current = chunks;
+  }, [chunks]);
+
+  // ⏱️ حسابات الأوقات وتوزيع المحاور
+  useEffect(() => {
+    if (!currentAudioUrl || chunks.length === 0) return;
 
     let isMounted = true;
     const storyAudio = new Audio(currentAudioUrl);
     storyAudioRef.current = storyAudio;
 
+    const processChunkTimes = (totalDuration: number) => {
+      const currentChunks = chunksRef.current;
+      if (currentChunks.length === 0) return;
+      
+      // إذا كانت حُسِبت مسبقاً، لا داعي لإعادة حسابها
+      if (currentChunks[0].startTime !== undefined) return;
+
+      const pivotIndices: number[] = [];
+      currentChunks.forEach((chunk, idx) => {
+        if (chunk.imageAsset) {
+          pivotIndices.push(idx);
+          console.log("🛠️ [ALL CHUNKS TIMES MAPPED]:", currentChunks.map(c => ({ id: c.id, start: c.startTime?.toFixed(2), end: c.endTime?.toFixed(2) })));
+        }
+      });
+
+      const pivotWeights = pivotIndices.map((startIndex, i) => {
+        const endIndex = (i < pivotIndices.length - 1) ? pivotIndices[i + 1] : currentChunks.length;
+        let charsInPivot = 0;
+        for (let j = startIndex; j < endIndex; j++) {
+          charsInPivot += currentChunks[j].text?.length || 1;
+        }
+        return charsInPivot;
+      });
+
+      const totalPivotChars = pivotWeights.reduce((sum, w) => sum + w, 0);
+      let accumulatedTime = 0;
+
+      pivotIndices.forEach((startIndex, i) => {
+        const endIndex = (i < pivotIndices.length - 1) ? pivotIndices[i + 1] : currentChunks.length;
+        const pivotDuration = totalDuration * (pivotWeights[i] / (totalPivotChars || 1));
+        const pivotStartTime = accumulatedTime;
+        const pivotEndTime = accumulatedTime + pivotDuration;
+        accumulatedTime = pivotEndTime;
+
+        const timePerChar = pivotDuration / (pivotWeights[i] || 1);
+        let subTime = pivotStartTime;
+        for (let j = startIndex; j < endIndex; j++) {
+          const charCount = currentChunks[j].text?.length || 1;
+          currentChunks[j].startTime = subTime;
+          subTime += charCount * timePerChar;
+          currentChunks[j].endTime = subTime;
+        }
+      });
+
+      if (currentChunks.length > 0) {
+        currentChunks[currentChunks.length - 1].endTime = totalDuration;
+      }
+    };
+console.log("🛠️ [CHUNKS PROCESSED TIMES]:", chunksRef.current.map(c => ({ id: c.id, start: c.startTime, end: c.endTime })));
     const handleLoadedMetadata = () => {
       if (!isMounted) return;
       const totalDuration = storyAudio.duration;
       setDuration(totalDuration);
-
-      if (chunks.length > 0 && chunks[0].startTime === undefined) {
-        const pivotIndices: number[] = [];
-        chunks.forEach((chunk, idx) => {
-          if (chunk.imageAsset) {
-            pivotIndices.push(idx);
-          }
-        });
-
-        const pivotWeights = pivotIndices.map((startIndex, i) => {
-          const endIndex = (i < pivotIndices.length - 1) ? pivotIndices[i + 1] : chunks.length;
-          let charsInPivot = 0;
-          for (let j = startIndex; j < endIndex; j++) {
-            charsInPivot += chunks[j].text?.length || 1;
-          }
-          return charsInPivot;
-        });
-
-        const totalPivotChars = pivotWeights.reduce((sum, w) => sum + w, 0);
-        let accumulatedTime = 0;
-
-        console.group("⏱️ [المقاطع المحورية الثمانية الأساسية]");
-        console.log(`⏱️ وقت الصوت الكامل: ${totalDuration.toFixed(2)} ثانية`);
-
-        pivotIndices.forEach((startIndex, i) => {
-          const endIndex = (i < pivotIndices.length - 1) ? pivotIndices[i + 1] : chunks.length;
-          const pivotDuration = totalDuration * (pivotWeights[i] / totalPivotChars);
-          const pivotStartTime = accumulatedTime;
-          const pivotEndTime = accumulatedTime + pivotDuration;
-          accumulatedTime = pivotEndTime;
-
-          const timePerChar = pivotDuration / pivotWeights[i];
-          let subTime = pivotStartTime;
-          for (let j = startIndex; j < endIndex; j++) {
-            const charCount = chunks[j].text?.length || 1;
-            chunks[j].startTime = subTime;
-            subTime += charCount * timePerChar;
-            chunks[j].endTime = subTime;
-          }
-
-          const mainChunk = chunks[startIndex];
-          const imgDur = pivotDuration * 0.85;
-          const owlDur = pivotDuration * 0.15;
-
-          console.log(
-            `🎯 [المحور ${i + 1} | ID: ${mainChunk.id}] ` +
-            `| الصورة: ${mainChunk.imageAsset?.split('/').pop()} ` +
-            `| البداية: ${pivotStartTime.toFixed(2)}s ` +
-            `| النهاية: ${pivotEndTime.toFixed(2)}s ` +
-            `| المدة الإجمالية: ${pivotDuration.toFixed(2)}s ` +
-            `| (صورة 85%: ${imgDur.toFixed(2)}s | بومة 15%: ${owlDur.toFixed(2)}s)`
-          );
-        });
-
-        if (chunks.length > 0) {
-          chunks[chunks.length - 1].endTime = totalDuration;
-        }
-
-        console.groupEnd();
-      }
+      processChunkTimes(totalDuration);
     };
 
     const handleTimeUpdate = () => {
@@ -162,24 +196,32 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({
       const time = storyAudio.currentTime;
       setCurrentTime(time);
 
-      if (chunks.length > 0) {
-        const matchingIndex = chunks.findIndex((chunk) => {
+      const currentChunks = chunksRef.current;
+      if (currentChunks.length > 0) {
+        const matchingIndex = currentChunks.findIndex((chunk) => {
           if (chunk.startTime !== undefined && chunk.endTime !== undefined) {
             return time >= chunk.startTime && time < chunk.endTime;
           }
           return false;
         });
 
-        if (matchingIndex !== -1 && matchingIndex !== currentChunkIndex) {
-          setCurrentChunkIndex(matchingIndex);
+        if (matchingIndex !== -1) {
+          setCurrentChunkIndex((prevIndex) => {
+            if (prevIndex !== matchingIndex) {
+              console.log(`🔄 [INDEX CHANGE]: من ${prevIndex} إلى ${matchingIndex} عند وقت ${time.toFixed(2)}s`);
+              return matchingIndex;
+            }
+            return prevIndex;
+          });
         }
       }
     };
     
     const handleEnded = () => {
       if (!isMounted) return;
+      const currentChunks = chunksRef.current;
 
-      if (chunks.length > 0 && currentChunkIndex < chunks.length - 1) {
+      if (currentChunks.length > 0 && currentChunkIndex < currentChunks.length - 1) {
         setCurrentChunkIndex((prev) => prev + 1);
       } else {
         setIsPlaying(false);
@@ -192,6 +234,11 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({
     storyAudio.addEventListener('timeupdate', handleTimeUpdate);
     storyAudio.addEventListener('ended', handleEnded);
 
+    if (!isNaN(storyAudio.duration) && storyAudio.duration > 0) {
+      setDuration(storyAudio.duration);
+      processChunkTimes(storyAudio.duration);
+    }
+
     if (isPlaying) {
       storyAudio.play().catch(() => setIsPlaying(false));
     }
@@ -203,8 +250,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({
       storyAudio.removeEventListener('timeupdate', handleTimeUpdate);
       storyAudio.removeEventListener('ended', handleEnded);
     };
-  }, [currentAudioUrl]);
-
+  }, [currentAudioUrl]); // تم الاعتماد على currentAudioUrl فقط لمنع إعادة تهيئة الـ Audio بلا مبرر
   const togglePlay = (shouldPlay?: boolean) => {
     const nextState = shouldPlay !== undefined ? shouldPlay : !isPlaying;
     setIsPlaying(nextState);
